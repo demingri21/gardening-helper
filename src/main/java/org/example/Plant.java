@@ -2,7 +2,6 @@ package org.example;
 
 public class Plant {
     private String name;
-    private String
     private final int wateringIntervalDays;
     private int daysSinceWatered;
 

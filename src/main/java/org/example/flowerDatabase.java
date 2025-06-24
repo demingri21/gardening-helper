@@ -8,7 +8,8 @@ public class flowerDatabase {
         createTable();
     }
 
-    public void createTable() {
+    private void createTable()
+    {
         String sql = "CREATE TABLE IF NOT EXISTS flowers ("
                 + "id INTEGER PRIMARY KEY AUTOINCREMENT, "
                 + "name TEXT NOT NULL, "
@@ -72,7 +73,8 @@ public class flowerDatabase {
             {
                 System.out.println(rs.getInt("id") + ": " +
                         rs.getString("name") + " - " +
-                        rs.getString("image_url"));
+                        rs.getInt("water_interval_days") + "-" +
+                        rs.getInt("days_since_watered"));
             }
         }
         catch (SQLException e)
@@ -81,8 +83,24 @@ public class flowerDatabase {
         }
     }
 
-    public String getDatabseName()
+    public void clearTable()
     {
-        return "flowers.db";
+        String sql = "DROP TABLE flowers";
+        try (Connection conn = DriverManager.getConnection("jdbc:sqlite:flowers.db");
+             Statement stmt = conn.createStatement())
+        {
+            stmt.executeUpdate(sql);
+            System.out.println("All rows deleted.");
+        }
+        catch (SQLException e)
+        {
+            e.printStackTrace();
+        }
+        createTable();
+    }
+
+    public String getDatabsePath()
+    {
+        return "./flowers.db";
     }
 }
