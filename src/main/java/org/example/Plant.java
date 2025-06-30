@@ -28,4 +28,19 @@ public class Plant {
         daysSinceWatered = 0;
     }
 
+    public String getName()
+    {
+        return name;
+    }
+
+    public int getWateringInterval()
+    {
+        return wateringIntervalDays;
+    }
+
+    public int getDaysSinceWatered()
+    {
+        return daysSinceWatered;
+    }
+
 }

@@ -1,5 +1,4 @@
 package org.example;
-import java.io.IOException;
 import java.util.Scanner;
 import java.util.ArrayList;
 
@@ -15,6 +14,8 @@ public class GardenReminder
         int water_interval_days;
         ArrayList<Plant> plantList = new ArrayList<>();
         int choice = 0;
+        System.out.println("type in current username");
+        String userId = scanner.nextLine();
         System.out.println("Type in the aws key");
         String key = scanner.nextLine();
         System.out.println("Type in the aws secret key");
@@ -39,37 +40,26 @@ public class GardenReminder
                     scanner.nextLine();
                     System.out.println("type y if you want to add an image, n otherwise");
                     file_path = scanner.nextLine();
+                    Plant newPlant;
                     if (file_path.equals("y"))
                     {
+                        newPlant = new Plant(plant_name, water_interval_days, days_since_watered);
                         System.out.println("please enter the filepath as an absolute path from your local device");
                     }
                     else
                     {
-                        db.insertFlower(plant_name, null, water_interval_days, days_since_watered);
+                        newPlant = new Plant(plant_name, water_interval_days, days_since_watered);
+                        db.insertFlower(userId, newPlant);
                     }
-                    Plant newPlant = new Plant(plant_name, water_interval_days, days_since_watered);
                     plantList.add(newPlant);
                     break;
                 case 2:
-                    s3.uploadFile("flowers.db");
-                    break;
-                case 3:
-                    try
-                    {
-                        s3.downloadFile("flowers.db");
-                    }
-                    catch (IOException e)
-                    {
-                        e.printStackTrace();
-                    }
                     break;
                 case 4:
-                    db.printAllFlowers();
-                    break;
-                case 5:
-                    db.clearTable();
+                    db.printAllFlowers(userId);
                     break;
             }
         }
+        db.close();
     }
 }
