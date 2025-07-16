@@ -1,65 +1,105 @@
 package org.example;
-import java.util.Scanner;
-import java.util.ArrayList;
 
-public class GardenReminder
-{
-    public static void main(String[] args)
-    {
-        flowerDatabase db = new flowerDatabase();
-        Scanner scanner = new Scanner(System.in);
-        String plant_name;
-        String file_path;
-        int days_since_watered;
-        int water_interval_days;
-        ArrayList<Plant> plantList = new ArrayList<>();
-        int choice = 0;
-        System.out.println("type in current username");
-        String userId = scanner.nextLine();
-        System.out.println("Type in the aws key");
-        String key = scanner.nextLine();
-        System.out.println("Type in the aws secret key");
-        String secret_key = scanner.nextLine();
-        S3Uploader s3 = new S3Uploader(key, secret_key);
-        while (choice != 2)
-        {
-            System.out.println("type 1 to add a new plant, 2 to upload data, 3 to download data, 4 to view all plants,"
-                    + "5 to clear data");
-            choice = scanner.nextInt();
-            scanner.nextLine();
-            switch (choice)
-            {
-                case 1:
-                    System.out.println("please enter the name of the plant");
-                    plant_name = scanner.nextLine();
-                    System.out.println("please enter how often you water the plant in days");
-                    water_interval_days = scanner.nextInt();
-                    scanner.nextLine();
-                    System.out.println("please enter how many days its been since you last watered the plant");
-                    days_since_watered = scanner.nextInt();
-                    scanner.nextLine();
-                    System.out.println("type y if you want to add an image, n otherwise");
-                    file_path = scanner.nextLine();
-                    Plant newPlant;
-                    if (file_path.equals("y"))
-                    {
-                        newPlant = new Plant(plant_name, water_interval_days, days_since_watered);
-                        System.out.println("please enter the filepath as an absolute path from your local device");
-                    }
-                    else
-                    {
-                        newPlant = new Plant(plant_name, water_interval_days, days_since_watered);
-                        db.insertFlower(userId, newPlant);
-                    }
-                    plantList.add(newPlant);
-                    break;
-                case 2:
-                    break;
-                case 4:
-                    db.printAllFlowers(userId);
-                    break;
+import static spark.Spark.*;
+import com.google.gson.Gson;
+
+public class GardenReminder {
+
+    static Gson gson = new Gson();
+    static flowerDatabase db = new flowerDatabase();
+    static String currentUsername = null;
+
+    public static void main(String[] args) {
+        staticFileLocation("/public");
+        port(8080);
+        enableCORS();
+        //POST /setUsername
+        post("/setUsername", (req, res) -> {
+            UsernameRequest data = gson.fromJson(req.body(), UsernameRequest.class);
+            currentUsername = data.username;
+            System.out.println("Username received: " + currentUsername);
+            res.type("text/plain");
+            return "Username saved: " + currentUsername;
+        });
+
+        //POST /addFlower
+        post("/addFlower", (req, res) -> {
+            if (currentUsername == null) {
+                res.status(400);
+                return "Error: Username not set yet. Please log in first.";
             }
-        }
-        db.close();
+
+            AddFlowerRequest data = gson.fromJson(req.body(), AddFlowerRequest.class);
+            Plant p = new Plant(data.flowerName, data.waterInterval, data.daysSinceWatered);
+            db.insertFlower(currentUsername, p); // use the global username
+            res.type("text/plain");
+            return "Flower added for user " + currentUsername;
+        });
+
+        get("/getFlowers", (req, res) -> {
+            if (currentUsername == null) {
+                res.status(400);
+                return "Error: Username not set yet. Please log in first.";
+            }
+
+            System.out.println("Username in /getFlowers route: " + currentUsername);
+
+            try {
+                String flowersJson = db.getAllFlowersJson(currentUsername);
+                System.out.println("Flowers JSON retrieved: " + flowersJson);
+                res.type("application/json");
+                return flowersJson;
+            } catch (Exception e) {
+                System.out.println("Exception in /getFlowers route: " + e.getMessage());
+                e.printStackTrace();
+                res.status(500);
+                return "Error fetching flowers: " + e.getMessage();
+            }
+        });
+
+        post("/deleteFlower", (req, res) -> {
+            if (currentUsername == null) {
+                res.status(400);
+                return "Error: Username not set.";
+            }
+
+            DeleteFlowerRequest data = gson.fromJson(req.body(), DeleteFlowerRequest.class);
+            db.deleteFlower(currentUsername, data.flowerName);
+            res.type("text/plain");
+            return "Deleted flower: " + data.flowerName;
+        });
+
+
+        System.out.println("Server running on http://localhost:8080/");
     }
+
+    private static void enableCORS() {
+        options("/*", (req, res) -> {
+            String headers = req.headers("Access-Control-Request-Headers");
+            if (headers != null) res.header("Access-Control-Allow-Headers", headers);
+            String methods = req.headers("Access-Control-Request-Method");
+            if (methods != null) res.header("Access-Control-Allow-Methods", methods);
+            return "OK";
+        });
+
+        before((req, res) -> {
+            res.header("Access-Control-Allow-Origin", "*");
+            res.header("Access-Control-Allow-Methods", "*");
+            res.header("Access-Control-Allow-Headers", "*");
+        });
+    }
+
+    //Helper classes
+    static class UsernameRequest { String username; }
+    static class AddFlowerRequest {
+        String username;
+        String flowerName;
+        int waterInterval;
+        int daysSinceWatered;
+    }
+    static class DeleteFlowerRequest {
+        String username;
+        String flowerName;
+    }
+
 }

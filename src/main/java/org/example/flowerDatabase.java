@@ -1,17 +1,13 @@
 package org.example;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import com.google.gson.Gson;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
-import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
-import software.amazon.awssdk.services.dynamodb.model.QueryRequest;
-import software.amazon.awssdk.services.dynamodb.model.QueryResponse;
 
 public class flowerDatabase
 {
@@ -25,90 +21,94 @@ public class flowerDatabase
         httpClient = HttpClient.newHttpClient();
     }
 
-    public void insertFlower(String userId, Plant plant)
-    {
-        HashMap<String, AttributeValue> tableEntries = new HashMap<>();
-        AttributeValue user = AttributeValue.builder().s(userId).build();
-        tableEntries.put("UserId", user);
+    public void insertFlower(String userId, Plant plant) throws Exception {
+        String json = String.format("""
+        {
+          "action": "insertFlower",
+          "userId": "%s",
+          "plant": {
+            "name": "%s",
+            "wateringInterval": %d,
+            "daysSinceWatered": %d
+          }
+        }
+        """, userId, plant.getName(), plant.getWateringInterval(), plant.getDaysSinceWatered());
 
-        AttributeValue flowerName = AttributeValue.builder().s(plant.getName()).build();
-        tableEntries.put("FlowerName", flowerName);
-
-        String waterIntervalString = Integer.toString(plant.getWateringInterval());
-        AttributeValue waterInterval = AttributeValue.builder().n(waterIntervalString).build();
-        tableEntries.put("WaterInterval", waterInterval);
-
-        String daysSinceWateredString = Integer.toString(plant.getDaysSinceWatered());
-        AttributeValue daysSinceWatered = AttributeValue.builder().n(daysSinceWateredString).build();
-        tableEntries.put("daysSinceWatered", daysSinceWatered);
-
-        PutItemRequest request = PutItemRequest.builder()
-                .tableName("FlowerDatabase")
-                .item(tableEntries)
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://u37i5p6ycl.execute-api.us-east-1.amazonaws.com/test_two/insertFlowers"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(json))
                 .build();
 
-        dyndbc.putItem(request);
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println("Insert flower response: " + response.body());
     }
 
-    /** public void insertFlower(String userId, Plant plant) {
-        try
-        {
-            String jsonPayload = String.format("""
-                {
-                "UserID": "%s",
-                "FlowerName": "%s",
-                "WateringInterval": %d,
-                "DaysSinceWatered": %d
-            }
-            """,
-                    userId,
-                    plant.getName(),
-                    plant.getWateringInterval(),
-                    plant.getDaysSinceWatered()
-            );
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(""))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
-                    .build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        }
-        catch (Exception e)
-        {
-            System.out.println("Error inserting flower: " + e.getMessage());
-        }
-    }**/
 
+    public void printAllFlowers(String userId) throws Exception {
+        // Build inner JSON with double-escaped quotes
+        String innerJson = String.format("{\\\"action\\\":\\\"getFlowers\\\",\\\"userId\\\":\\\"%s\\\"}", userId);
 
-    public void printAllFlowers(String userId)
-    {
-        AttributeValue userAttribute = AttributeValue.builder().s(userId).build();
-        QueryRequest queryRequest = QueryRequest.builder().
-                tableName("FlowerDatabase").keyConditionExpression("UserId = :userId")
-                .expressionAttributeValues(Map.of(":userId", userAttribute))
+        // Wrap it under 'body'
+        String fullJson = String.format("{\"body\":\"%s\"}", innerJson);
+        System.out.println("Outgoing POST body: " + fullJson);
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://u37i5p6ycl.execute-api.us-east-1.amazonaws.com/test_two/grabFlowers"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(fullJson))
                 .build();
-        QueryResponse response = dyndbc.query(queryRequest);
-        List<Map<String, AttributeValue>> flowers = response.items();
-        if (flowers.isEmpty())
-        {
-            System.out.println("you have no flowers in your list");
-        }
-        for (int i = 0; i < flowers.size(); i++)
-        {
-            Map<String, AttributeValue> item = flowers.get(i);
-            String flowerName = item.get("FlowerName").s();
-            String wateringInterval = item.get("WaterInterval").n();
-            String lastWatered = item.get("daysSinceWatered").n();
-            System.out.println("Flower: " + flowerName);
-            System.out.println("Watering Interval: " + wateringInterval + " days");
-            System.out.println("Last Watered: " + lastWatered);
-        }
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        String responseBody = response.body();
+        System.out.println("Raw Lambda response: " + responseBody);
+
+        // Parse outer Lambda response
+        Gson gson = new Gson();
+        Map<String, Object> outer = gson.fromJson(responseBody, Map.class);
+
+        String innerBody = (String) outer.get("body");
+
+        List<Map<String, Object>> flowers = gson.fromJson(innerBody, List.class);
+        System.out.println("Parsed flowers: " + flowers);
     }
 
-    public void clearTable()
+    public String getAllFlowersJson(String userId) throws Exception {
+        String innerJson = String.format("{\\\"action\\\":\\\"getFlowers\\\",\\\"userId\\\":\\\"%s\\\"}", userId);
+        String fullJson = String.format("{\"body\":\"%s\"}", innerJson);
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://u37i5p6ycl.execute-api.us-east-1.amazonaws.com/test_two/grabFlowers"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(fullJson))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        String responseBody = response.body();
+        System.out.println("Full Lambda response body: " + responseBody);
+
+        // Directly return responseBody since it is a JSON array string
+        return responseBody;
+    }
+
+    public void deleteFlower(String userId, String flowerName) throws Exception {
+        String json = String.format("""
     {
-
+      "action": "deleteFlower",
+      "userId": "%s",
+      "flowerName": "%s"
     }
+    """, userId, flowerName);
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://u37i5p6ycl.execute-api.us-east-1.amazonaws.com/test/deleteFlowers"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(json))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println("Delete flower response: " + response.body());
+    }
+
 
     public String getDatabsePath()
     {

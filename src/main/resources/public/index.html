@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Garden Reminder UI</title>
+    <script src="script.js"></script>
+</head>
+<body>
+<h1>Garden Reminder</h1>
+
+<div id="login">
+    <label>Username: <input id="username" /></label>
+    <button onclick="saveUsername()">Submit</button>
+</div>
+
+<div id="mainUI" style="display:none;">
+    <h2>Welcome, <span id="displayUsername"></span></h2>
+
+    <h3>Add Flower</h3>
+    <input id="newFlowerName" placeholder="Name" />
+    <input id="waterInterval" type="number" placeholder="Interval (days)" />
+    <input id="daysSinceWatered" type="number" placeholder="Days since watered" />
+    <button onclick="addFlower()">Add</button>
+
+    <h3>Flower List</h3>
+    <div id="flowersList"></div>
+</div>
+</body>
+</html>
